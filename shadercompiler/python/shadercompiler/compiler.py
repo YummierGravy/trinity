@@ -2,37 +2,43 @@
 import os
 import subprocess
 import sys
-import json
 
 BUILDER_DIR = os.path.dirname(os.path.abspath(__file__))
 
+ENGINE_TOOLSET = 'v145'
 
-def _find_branch_dir(start):
-    directory = start
+if sys.platform == 'win32':
+    ENGINE_PLATFORM_FOLDER = os.path.join('Windows', 'x64', ENGINE_TOOLSET)
+    COMPILER_NAME = 'ShaderCompiler.exe'
+elif sys.platform == 'darwin':
+    ENGINE_PLATFORM_FOLDER = os.path.join('macOS', 'universal', 'AppleClang')
+    COMPILER_NAME = 'ShaderCompiler'
+else:
+    raise RuntimeError('unsupported platform')
+
+
+def _find_compiler():
+    """The ShaderCompiler the carbon engine ships in its bin folder.
+
+    This package is imported either from the engine's own tree, <engine>/<platform folder>/python/shadercompiler, where
+    the compiler is next to the python folder, or from a copy a branch made of it (updateBinaries copies it into
+    packages/), where the engine is in the branch's vendor/carbon.
+    """
+    candidates = [os.path.join(BUILDER_DIR, '..', '..', 'bin', COMPILER_NAME)]
+    directory = BUILDER_DIR
     while True:
-        if os.path.isfile(os.path.join(directory, 'carbon.json')):
-            return directory
+        candidates.append(os.path.join(directory, 'vendor', 'carbon', ENGINE_PLATFORM_FOLDER, 'bin', COMPILER_NAME))
         parent = os.path.dirname(directory)
         if parent == directory:  # reached the filesystem root
             break
         directory = parent
-    raise RuntimeError('could not locate carbon.json in any parent of %s' % start)
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return os.path.abspath(candidate)
+    raise RuntimeError('could not locate %s in the engine from %s' % (COMPILER_NAME, BUILDER_DIR))
 
 
-BRANCH_DIR = _find_branch_dir(BUILDER_DIR)
-
-carbonjson = json.load(open(os.path.join(BRANCH_DIR, 'carbon.json')))
-
-SHADER_COMPILER_PATH = os.path.join(BRANCH_DIR, "vendor", carbonjson['libraries']['carbon_trinity'], "shadercompiler",
-                                    "bin")
-
-if sys.platform == 'win32':
-    COMPILER_PATH = os.path.abspath(os.path.join(SHADER_COMPILER_PATH, 'Windows', 'x64', 'v141', 'ShaderCompiler.exe'))
-elif sys.platform == 'darwin':
-    COMPILER_PATH = os.path.abspath(
-        os.path.join(SHADER_COMPILER_PATH, 'macOS', 'universal', 'AppleClang', 'ShaderCompiler'))
-else:
-    raise RuntimeError('unsupported platform')
+COMPILER_PATH = _find_compiler()
 
 
 class GLESExtensionOption(object):
