@@ -1,6 +1,10 @@
 {
   "dependencies": [
     {
+      "name": "fmt",
+      "version>=": "11.0.2"
+    },
+    {
       "name": "gtest",
       "version>=": "1.16.0",
       "host": true
